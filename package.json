@@ -1,0 +1,28 @@
+{
+  "name": "dnbdplutils_v2",
+  "version": "2.0.0",
+  "description": "D&B Direct+ utilities (v2)",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hdr1001/dnbDplUtils_v2.git"
+  },
+  "keywords": [
+    "D&B",
+    "Dun",
+    "Bradstreet",
+    "Direct+",
+    "Utilities",
+    "JavaScript"
+  ],
+  "author": "Hans de Rooij",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/hdr1001/dnbDplUtils_v2/issues"
+  },
+  "homepage": "https://github.com/hdr1001/dnbDplUtils_v2#readme"
+}
