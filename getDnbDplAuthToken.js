@@ -25,8 +25,8 @@ import { httpToken, ReqDnbDpl } from './dnbDplLib.js';
 //Get a new authentication token
 new ReqDnbDpl(httpToken).execReq('', true)
    .then(oResp => {
-      if(oResp.access_token) {
-         console.log(oResp.access_token)
+      if(oResp.httpStatus === 200) {
+         console.log(oResp.oBody.access_token)
       }
       else {
          console.log(JSON.stringify(oResp, null, 3))
@@ -37,6 +37,6 @@ new ReqDnbDpl(httpToken).execReq('', true)
 /*
 //List the token request response body
 new ReqDnbDpl(httpToken).execReq('Authorization token request')
-   .then(resp => console.log(resp.toString()))
+   .then(resp => console.log(resp.buffBody.toString()))
    .catch(err => console.error(err.message));
 */

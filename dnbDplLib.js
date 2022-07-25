@@ -58,6 +58,8 @@ function getBase64EncCredentials() {
 //D&B Direct+ HTTP request class
 class ReqDnbDpl {
    constructor(reqType, arrResource, oQryStr) {
+      this.reqType = reqType;
+
       this.httpAttr = {...arrHttpAttr[reqType]};
 
       if(arrResource && arrResource.length) {
@@ -94,22 +96,25 @@ class ReqDnbDpl {
 
                if(bRetObj) {
                   try {
-                     resolve(JSON.parse(body));
+                     resolve({ oBody: JSON.parse(body), httpStatus: resp.statusCode })
                   }
                   catch(err) { reject(err) }
                }
                else {
-                  resolve(body); //Please note body is a buffer!
+                   //Please note body is of type buffer!
+                  resolve({ buffBody: body, httpStatus: resp.statusCode })
                }
             });
          });
 
          if(this.httpAttr.method === 'POST') {
-            httpReq.write('{ "grant_type": "client_credentials" }');
+            if(this.reqType === httpToken) {
+               httpReq.write('{ "grant_type": "client_credentials" }')
+            }
          }
 
          httpReq.end();
-      });
+      })
    }
 }
 
