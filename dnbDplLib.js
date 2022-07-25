@@ -42,7 +42,14 @@ const arrHttpAttr = [
 //Base64 encode the D&B Direct+ credentials
 function getBase64EncCredentials() {
    if(!process.env.DNB_DPL_KEY || !process.env.DNB_DPL_SECRET) {
-      throw new Error('Please set API credentials as environment variables')
+      let sErrMsg = 'Please set the Direct+ API credentials as environment variables\n';
+      sErrMsg += 'When using a GitHub Codespace best paractice is to use Codespaces Secrets\n';
+      sErrMsg += 'On your GitHub acct, go to Settings, Codespaces, Codespaces Secrets\n';
+      sErrMsg += 'Otherwise just set the environment variables: DNB_DPL_TOKEN=abc1234...\n';
+      
+      console.log(sErrMsg);
+
+      return '';
    }
 
    return Buffer.from(process.env.DNB_DPL_KEY + ':' + process.env.DNB_DPL_SECRET).toString('Base64');
@@ -80,21 +87,19 @@ class ReqDnbDpl {
 
             resp.on('end', () => { //The data product is now available in full
                if(reqMsgOnEnd) { 
-                  console.log(reqMsgOnEnd + ' (HTTP status code ' + resp.statusCode + ')');
+                  console.log(`${reqMsgOnEnd} (HTTP status code ${resp.statusCode})`);
 
                   //if(resp.statusCode !== 200) { console.log(body.join('')) }
                }
 
-               //if(bLogResp) { logResp(body, resp.statusCode) }
-
                if(bRetObj) {
                   try {
-                     resolve(JSON.parse(body.join('')));
+                     resolve(JSON.parse(body));
                   }
                   catch(err) { reject(err) }
                }
                else {
-                  resolve(body);
+                  resolve(body); //Please note body is a buffer!
                }
             });
          });

@@ -23,18 +23,20 @@
 import { httpToken, ReqDnbDpl } from './dnbDplLib.js';
 
 //Get a new authentication token
-try {
-   new ReqDnbDpl(httpToken).execReq('', true)
-      .then(oResp => {
-         if(oResp.access_token) {
-            console.log(oResp.access_token)
-         }
-         else {
-            console.log(JSON.stringify(oResp, null, 3))
-         }
-      })
-      .catch(err => console.error(err.message));
-}
-catch(err) {
-   console.error(err.message)
-}
+new ReqDnbDpl(httpToken).execReq('', true)
+   .then(oResp => {
+      if(oResp.access_token) {
+         console.log(oResp.access_token)
+      }
+      else {
+         console.log(JSON.stringify(oResp, null, 3))
+      }
+   })
+   .catch(err => console.error(err.message));
+
+/*
+//List the token request response body
+new ReqDnbDpl(httpToken).execReq('Authorization token request')
+   .then(resp => console.log(resp.toString()))
+   .catch(err => console.error(err.message));
+*/
