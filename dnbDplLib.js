@@ -24,6 +24,7 @@ import * as https from 'https';
 
 //Index values into the HTTP attribute array
 const httpToken = 0;
+const httpBlocks = 1;
 
 //D&B Direct+ API defaults
 const httpDnbDpl = {
@@ -36,7 +37,8 @@ const httpDnbDpl = {
 
 //D&B Direct+ defaults for individual endpoints
 const arrHttpAttr = [
-   {...httpDnbDpl, method: 'POST', path: '/v2/token'}
+   {...httpDnbDpl, method: 'POST', path: '/v2/token'},
+   {...httpDnbDpl, path: '/v1/data/duns'}
 ];
 
 //Base64 encode the D&B Direct+ credentials
@@ -66,7 +68,7 @@ class ReqDnbDpl {
          this.httpAttr.path += '/' + arrResource.join('/')
       };
    
-      if(oQryStr) {this.httpAttr.path += '?' + new URLSearchParams(oQryStr).stringify()}
+      if(oQryStr) {this.httpAttr.path += '?' + new URLSearchParams(oQryStr).toString()}
    
       if(reqType === httpToken) {
          this.httpAttr.headers.Authorization = 'Basic ' + getBase64EncCredentials()
@@ -118,4 +120,8 @@ class ReqDnbDpl {
    }
 }
 
-export { httpToken, ReqDnbDpl };
+export {
+   httpToken,
+   httpBlocks,
+   ReqDnbDpl
+};
