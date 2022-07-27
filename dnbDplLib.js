@@ -21,6 +21,8 @@
 // *********************************************************************
 
 import * as https from 'https';
+import * as path from 'path';
+import { readFileSync } from 'fs';
 
 //Index values into the HTTP attribute array
 const httpToken = 0;
@@ -120,8 +122,27 @@ class ReqDnbDpl {
    }
 }
 
+function readDunsFile(oFilePath) {
+   let arrDUNS = [];
+
+   try {
+      arrDUNS = readFileSync(path.format(oFilePath)).toString().split('\n');
+   }
+   catch(err) {
+      console.log(err.message);
+      return arrDUNS;
+   }
+
+   return arrDUNS
+      .map(sDUNS => sDUNS.trim()) //Remove any unwanted whitespace
+      .filter(sDUNS => !!sDUNS) //Remove empty values from the array
+      .filter(sDUNS => /^\d*$/.test(sDUNS)) //Filter non numeric values
+      .map(sDUNS => '000000000'.slice(0, 9 - sDUNS.length) + sDUNS);
+}
+
 export {
    httpToken,
    httpBlocks,
-   ReqDnbDpl
+   ReqDnbDpl,
+   readDunsFile
 };

@@ -24,7 +24,8 @@ import * as path from 'path';
 import { promises as fs } from 'fs';
 import { 
    httpBlocks,
-   ReqDnbDpl
+   ReqDnbDpl,
+   readDunsFile
 } from './dnbDplLib.js';
 
 //Application settings
@@ -50,7 +51,7 @@ const filePathOut = { root: '', dir: 'out' };
 const sDate = new Date().toISOString().split('T')[0];
 
 //Read & parse the DUNS to retrieve from the file DUNS.txt
-const arrDUNS = [ 404248536, 418460788, 404553448 ];
+const arrDUNS = readDunsFile(filePathIn);
 
 //Main application logic
 if(arrDUNS.length === 0) { //Check if there are any valid DUNS available
