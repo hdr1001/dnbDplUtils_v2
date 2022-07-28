@@ -23,10 +23,9 @@
 import * as https from 'https';
 import * as path from 'path';
 import { readFileSync } from 'fs';
+import { RateLimiter } from 'limiter';
 
-//Index values into the HTTP attribute array
-const httpToken = 0;
-const httpBlocks = 1;
+const dnbDplLimiter = new RateLimiter({ tokensPerInterval: 5, interval: 'second' });
 
 //D&B Direct+ API defaults
 const httpDnbDpl = {
@@ -36,6 +35,10 @@ const httpDnbDpl = {
       'Content-Type': 'application/json'
    }
 };
+
+//Index values into the HTTP attribute array
+const httpToken = 0;
+const httpBlocks = 1;
 
 //D&B Direct+ defaults for individual endpoints
 const arrHttpAttr = [
@@ -84,40 +87,44 @@ class ReqDnbDpl {
    execReq(reqMsgOnEnd, bRetObj) {
       //The actual HTTP request wrapped in a promise
       return new Promise((resolve, reject) => {
-         const httpReq = https.request(this.httpAttr, resp => {
-            const body = [];
-
-            resp.on('error', err => reject(err));
-
-            resp.on('data', chunk => body.push(chunk));
-
-            resp.on('end', () => { //The data product is now available in full
-               if(reqMsgOnEnd) { 
-                  console.log(`${reqMsgOnEnd} (HTTP status code ${resp.statusCode})`);
-
-                  //if(resp.statusCode !== 200) { console.log(body.join('')) }
-               }
-
-               if(bRetObj) {
-                  try {
-                     resolve({ oBody: JSON.parse(body), httpStatus: resp.statusCode })
+         dnbDplLimiter.removeTokens(1)
+            .then(() => {
+               const httpReq = https.request(this.httpAttr, resp => {
+                  const body = [];
+      
+                  resp.on('error', err => reject(err));
+      
+                  resp.on('data', chunk => body.push(chunk));
+      
+                  resp.on('end', () => { //The data product is now available in full
+                     if(reqMsgOnEnd) { 
+                        console.log(`${reqMsgOnEnd} (HTTP status code ${resp.statusCode})`);
+      
+                        //if(resp.statusCode !== 200) { console.log(body.join('')) }
+                     }
+      
+                     if(bRetObj) {
+                        try {
+                           resolve({ oBody: JSON.parse(body), httpStatus: resp.statusCode })
+                        }
+                        catch(err) { reject(err) }
+                     }
+                     else {
+                         //Please note body is of type buffer!
+                        resolve({ buffBody: body, httpStatus: resp.statusCode })
+                     }
+                  });
+               });
+      
+               if(this.httpAttr.method === 'POST') {
+                  if(this.reqType === httpToken) {
+                     httpReq.write('{ "grant_type": "client_credentials" }')
                   }
-                  catch(err) { reject(err) }
                }
-               else {
-                   //Please note body is of type buffer!
-                  resolve({ buffBody: body, httpStatus: resp.statusCode })
-               }
-            });
-         });
-
-         if(this.httpAttr.method === 'POST') {
-            if(this.reqType === httpToken) {
-               httpReq.write('{ "grant_type": "client_credentials" }')
-            }
-         }
-
-         httpReq.end();
+      
+               httpReq.end();
+            })
+            .catch(err => reject(err))
       })
    }
 }
@@ -136,7 +143,14 @@ function readDunsFile(oFilePath) {
    return arrDUNS
       .map(sDUNS => sDUNS.trim()) //Remove any unwanted whitespace
       .filter(sDUNS => !!sDUNS) //Remove empty values from the array
-      .filter(sDUNS => /^\d*$/.test(sDUNS)) //Filter non numeric values
+      .map(sDUNS => //Correct the old school XX-XXX-XXXX DUNS format
+         sDUNS.length === 11 && sDUNS.slice(2, 3) === '-' && sDUNS.slice(6, 7) === '-'
+            ? sDUNS.slice(0, 2) + sDUNS.slice(3, 6) + sDUNS.slice(7)
+            : sDUNS
+      )
+      .filter(sDUNS => //Filter strings which are too long & non numeric values
+         sDUNS.length <= 9 && /^\d*$/.test(sDUNS)
+      )
       .map(sDUNS => '000000000'.slice(0, 9 - sDUNS.length) + sDUNS);
 }
 
