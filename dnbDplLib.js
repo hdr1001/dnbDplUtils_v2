@@ -39,11 +39,13 @@ const httpDnbDpl = {
 //Index values into the HTTP attribute array
 const httpToken = 0;
 const httpBlocks = 1;
+const httpBeneficialOwner = 2;
 
 //D&B Direct+ defaults for individual endpoints
 const arrHttpAttr = [
    {...httpDnbDpl, method: 'POST', path: '/v2/token'},
-   {...httpDnbDpl, path: '/v1/data/duns'}
+   {...httpDnbDpl, path: '/v1/data/duns'},
+   {...httpDnbDpl, path: '/v1/beneficialowner'}
 ];
 
 //Base64 encode the D&B Direct+ credentials
@@ -157,6 +159,7 @@ function readDunsFile(oFilePath) {
 export {
    httpToken,
    httpBlocks,
+   httpBeneficialOwner,
    ReqDnbDpl,
    readDunsFile
 };
