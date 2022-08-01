@@ -29,32 +29,60 @@ import {
    readDunsFile
 } from './dnbDplLib.js';
 
-//Default application settings
-const arrDBs = [
-   {db: 'companyinfo',              dbShort: 'ci', level: 2, version: '1'},
-   {db: 'principalscontacts',       dbShort: 'pc', level: 3, version: '2'},
-   {db: 'hierarchyconnections',     dbShort: 'hc', level: 1, version: '1'},
-   {db: 'financialstrengthinsight', dbShort: 'fs', level: 2, version: '1'},
-   {db: 'paymentinsight',           dbShort: 'pi', level: 1, version: '1'},
-//   {db: 'eventfilings',             dbShort: 'ef', level: 1, version: '1'},
-//   {db: 'companyfinancials',        dbShort: 'cf', level: 4, version: '2'},
-   {db: 'globalfinancials',         dbShort: 'gf', level: 1, version: '1'},
-//   {db: 'esginsight',               dbShort: 'ei', level: 3, version: '1'},
-//   {db: 'ownershipinsight',         dbShort: 'oi', level: 1, version: '1'},
-//   {db: 'globalbusinessranking',    dbShort: 'br', level: 1, version: '1'}
-];
-let httpEndpoint = httpBlocks;
-const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`);
-let fileBase = arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl');
+//Application defaults
 const tradeUp = null; //Set to {tradeUp: 'hq'} if trade-up is needed
 const reasonCode = { orderReason: '6332' };
-let qryStr = { blockIDs: arrBlockIDs.join(','), ...reasonCode , ...tradeUp };
+
+//Defaults for reading and writing files
 const filePathIn = { root: '', dir: 'in', base: 'DUNS.txt' };
 const filePathOut = { root: '', dir: 'out' };
 const sDate = new Date().toISOString().split('T')[0];
 
-//Beneficial ownership parameters
-const cmpBeneficialOwner = ''; //Set to cmpbos or cmpbol for beneficial ownership data
+function getDnbDplDataBlockReqObj() {
+   const arrDBs = [
+      {db: 'companyinfo',              dbShort: 'ci', level: 2, version: '1'},
+      {db: 'principalscontacts',       dbShort: 'pc', level: 3, version: '2'},
+      {db: 'hierarchyconnections',     dbShort: 'hc', level: 1, version: '1'},
+      {db: 'financialstrengthinsight', dbShort: 'fs', level: 2, version: '1'},
+      {db: 'paymentinsight',           dbShort: 'pi', level: 1, version: '1'},
+   //   {db: 'eventfilings',             dbShort: 'ef', level: 1, version: '1'},
+   //   {db: 'companyfinancials',        dbShort: 'cf', level: 4, version: '2'},
+      {db: 'globalfinancials',         dbShort: 'gf', level: 1, version: '1'},
+   //   {db: 'esginsight',               dbShort: 'ei', level: 3, version: '1'},
+   //   {db: 'ownershipinsight',         dbShort: 'oi', level: 1, version: '1'},
+   //   {db: 'globalbusinessranking',    dbShort: 'br', level: 1, version: '1'}
+   ];
+
+   const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`);
+
+   return {
+      httpAttr: httpBlocks,
+      arrBlockIDs,
+      fileBase: arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl'),
+      qryStr: { blockIDs: arrBlockIDs.join(','), ...reasonCode , ...tradeUp }
+   }
+}
+
+function getDnbDplBeneficialOwnerReqObj() {
+   const cmpBeneficialOwner = 'cmpbol'; //Can be cmpbol or cmpbos
+
+   return {
+      httpAttr: httpBeneficialOwner,
+      fileBase: `dnb_dpl_${cmpBeneficialOwner}`,
+      qryStr: {
+         productId: cmpBeneficialOwner,
+         versionId: 'v1',
+         ownershipPercentage: 2.5,
+         tradeUp: 'hq'
+      }
+   }
+}
+
+//Instantiate an array containing all relevant request objects
+const arrReqObjs = [
+   getDnbDplDataBlockReqObj(),
+   getDnbDplBeneficialOwnerReqObj(),
+];
 
 //Read & parse the DUNS to retrieve from the file DUNS.txt
 const arrDUNS = readDunsFile(filePathIn);
@@ -67,29 +95,27 @@ else { //Download and persist the data blocks for the requested DUNS
    console.log('Test file contains ' + arrDUNS.length + ' DUNS records');
 
    arrDUNS.forEach(DUNS => {
-      if(cmpBeneficialOwner) {
-         httpEndpoint = httpBeneficialOwner;
+      arrReqObjs.forEach(reqObj => {
+         const req = { ...reqObj };
 
-         qryStr = {
-            duns: DUNS,
-            productId: cmpBeneficialOwner,
-            versionId: 'v1',
-            ownershipPercentage: 2.5,
-            tradeUp: 'hq'
-         };
+         if(req.httpAttr === httpBlocks) {
+            req.arrResource = [DUNS]
+         }
 
-         fileBase = `dnb_dpl_${cmpBeneficialOwner}`;
-      }
+         if(req.httpAttr === httpBeneficialOwner) {
+            req.qryStr.duns = DUNS
+         }
 
-      new ReqDnbDpl(httpEndpoint, httpEndpoint === httpBlocks ? [DUNS] : '', qryStr)
-         .execReq(`Request for DUNS ${DUNS}`)
-            .then(resp => {
-               const base = `${fileBase}_${DUNS}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
+         new ReqDnbDpl(req.httpAttr, req.arrResource, req.qryStr)
+            .execReq(`Request for DUNS ${DUNS}`)
+               .then(resp => {
+                  const base = `${req.fileBase}_${DUNS}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
 
-               fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
-                  .then( /* console.log(`Wrote file ${base} successfully`) */ )
-                  .catch(err => console.error(err.message));
-            })
-            .catch(err => console.error(err.message));
+                  fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
+                     .then( /* console.log(`Wrote file ${base} successfully`) */ )
+                     .catch(err => console.error(err.message));
+               })
+               .catch(err => console.error(err.message));
+      })
    });
 }
