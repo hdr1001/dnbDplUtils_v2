@@ -40,12 +40,14 @@ const httpDnbDpl = {
 const httpToken = 0;
 const httpBlocks = 1;
 const httpBeneficialOwner = 2;
+const httpFamilyTree = 3;
 
 //D&B Direct+ defaults for individual endpoints
 const arrHttpAttr = [
    {...httpDnbDpl, method: 'POST', path: '/v2/token'},
    {...httpDnbDpl, path: '/v1/data/duns'},
-   {...httpDnbDpl, path: '/v1/beneficialowner'}
+   {...httpDnbDpl, path: '/v1/beneficialowner'},
+   {...httpDnbDpl, path: '/v1/familyTree'}
 ];
 
 //Base64 encode the D&B Direct+ credentials
@@ -69,7 +71,7 @@ class ReqDnbDpl {
    constructor(reqType, arrResource, oQryStr) {
       this.reqType = reqType;
 
-      this.httpAttr = {...arrHttpAttr[reqType]};
+      this.httpAttr = { ...arrHttpAttr[reqType] };
 
       if(arrResource && arrResource.length) {
          this.httpAttr.path += '/' + arrResource.join('/')
@@ -160,6 +162,7 @@ export {
    httpToken,
    httpBlocks,
    httpBeneficialOwner,
+   httpFamilyTree,
    ReqDnbDpl,
    readDunsFile
 };

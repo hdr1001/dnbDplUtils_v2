@@ -1,7 +1,7 @@
 // *********************************************************************
 //
-// Get D&B Direct+ Data Blocks for a list of DUNS
-// JavaScript code file: getDBsForLoD.js
+// Get D&B Direct+ Data for a list of DUNS
+// JavaScript code file: getDnbDplLoD.js
 //
 // Copyright 2022 Hans de Rooij
 //
@@ -25,6 +25,7 @@ import { promises as fs } from 'fs';
 import { 
    httpBlocks,
    httpBeneficialOwner,
+   httpFamilyTree,
    ReqDnbDpl,
    readDunsFile
 } from './dnbDplLib.js';
@@ -47,7 +48,7 @@ function getDnbDplDataBlockReqObj() {
       {db: 'paymentinsight',           dbShort: 'pi', level: 1, version: '1'},
    //   {db: 'eventfilings',             dbShort: 'ef', level: 1, version: '1'},
    //   {db: 'companyfinancials',        dbShort: 'cf', level: 4, version: '2'},
-      {db: 'globalfinancials',         dbShort: 'gf', level: 1, version: '1'},
+   //   {db: 'globalfinancials',         dbShort: 'gf', level: 1, version: '1'},
    //   {db: 'esginsight',               dbShort: 'ei', level: 3, version: '1'},
    //   {db: 'ownershipinsight',         dbShort: 'oi', level: 1, version: '1'},
    //   {db: 'globalbusinessranking',    dbShort: 'br', level: 1, version: '1'}
@@ -78,10 +79,19 @@ function getDnbDplBeneficialOwnerReqObj() {
    }
 }
 
+function getDnbDplFullFamTreeReqObj() {
+   return {
+      httpAttr: httpFamilyTree,
+      fileBase: `dnb_dpl_full_fam_tree`,
+      qryStr: {} // { exclusionCriteria: 'Branches' }
+   }
+}
+
 //Instantiate an array containing all relevant request objects
 const arrReqObjs = [
    getDnbDplDataBlockReqObj(),
    getDnbDplBeneficialOwnerReqObj(),
+   getDnbDplFullFamTreeReqObj(),
 ];
 
 //Read & parse the DUNS to retrieve from the file DUNS.txt
@@ -98,7 +108,7 @@ else { //Download and persist the data blocks for the requested DUNS
       arrReqObjs.forEach(reqObj => {
          const req = { ...reqObj };
 
-         if(req.httpAttr === httpBlocks) {
+         if(req.httpAttr === httpBlocks || req.httpAttr === httpFamilyTree) {
             req.arrResource = [DUNS]
          }
 
