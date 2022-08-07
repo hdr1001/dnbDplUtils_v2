@@ -46,7 +46,7 @@ function getDnbDplDataBlockReqObj() {
       {db: 'hierarchyconnections',     dbShort: 'hc', level: 1, version: '1'},
       {db: 'financialstrengthinsight', dbShort: 'fs', level: 2, version: '1'},
       {db: 'paymentinsight',           dbShort: 'pi', level: 1, version: '1'},
-   //   {db: 'eventfilings',             dbShort: 'ef', level: 1, version: '1'},
+      {db: 'eventfilings',             dbShort: 'ef', level: 1, version: '1'},
    //   {db: 'companyfinancials',        dbShort: 'cf', level: 4, version: '2'},
    //   {db: 'globalfinancials',         dbShort: 'gf', level: 1, version: '1'},
    //   {db: 'esginsight',               dbShort: 'ei', level: 3, version: '1'},
@@ -90,8 +90,8 @@ function getDnbDplFullFamTreeReqObj() {
 //Instantiate an array containing all relevant request objects
 const arrReqObjs = [
    getDnbDplDataBlockReqObj(),
-   getDnbDplBeneficialOwnerReqObj(),
-   getDnbDplFullFamTreeReqObj(),
+//   getDnbDplBeneficialOwnerReqObj(),
+//   getDnbDplFullFamTreeReqObj(),
 ];
 
 //Read & parse the DUNS to retrieve from the file DUNS.txt
