@@ -41,13 +41,15 @@ const httpToken = 0;
 const httpBlocks = 1;
 const httpBeneficialOwner = 2;
 const httpFamilyTree = 3;
+const httpIDR = 4;
 
 //D&B Direct+ defaults for individual endpoints
 const arrHttpAttr = [
    {...httpDnbDpl, method: 'POST', path: '/v2/token'},
    {...httpDnbDpl, path: '/v1/data/duns'},
    {...httpDnbDpl, path: '/v1/beneficialowner'},
-   {...httpDnbDpl, path: '/v1/familyTree'}
+   {...httpDnbDpl, path: '/v1/familyTree'},
+   {...httpDnbDpl, path: '/v1/match/cleanseMatch'}
 ];
 
 //Base64 encode the D&B Direct+ credentials
@@ -133,29 +135,52 @@ class ReqDnbDpl {
    }
 }
 
-function readDunsFile(oFilePath) {
-   let arrDUNS = [];
+function readInpFile(oFilePath, splitOn) {
+   let arrIn = [];
 
+   //Read the input file (async)
    try {
-      arrDUNS = readFileSync(path.format(oFilePath)).toString().split('\n');
+      arrIn = readFileSync(path.format(oFilePath)).toString().split('\n')
    }
    catch(err) {
       console.log(err.message);
-      return arrDUNS;
+      return arrIn;
    }
 
-   return arrDUNS
-      .map(sDUNS => sDUNS.trim()) //Remove any unwanted whitespace
-      .filter(sDUNS => !!sDUNS) //Remove empty values from the array
-      .map(sDUNS => //Correct the old school XX-XXX-XXXX DUNS format
-         sDUNS.length === 11 && sDUNS.slice(2, 3) === '-' && sDUNS.slice(6, 7) === '-'
-            ? sDUNS.slice(0, 2) + sDUNS.slice(3, 6) + sDUNS.slice(7)
-            : sDUNS
-      )
-      .filter(sDUNS => //Filter strings which are too long & non numeric values
-         sDUNS.length <= 9 && /^\d*$/.test(sDUNS)
-      )
-      .map(sDUNS => '000000000'.slice(0, 9 - sDUNS.length) + sDUNS);
+   //Remove empty rows
+   arrIn = arrIn.map(row => row.trim()).filter(row => !!row);
+
+   //Split the row fields into columns
+   if(splitOn) {
+      arrIn = arrIn.map(row => row.split(splitOn))
+   }
+
+   //Split the rows into a header (arrIn) & input rows (arrRows)
+   let arrRows = arrIn.splice(1);
+
+   //Return an array of cleaned-up DUNS objects
+   if(typeof arrIn[0] === 'string' && arrIn[0] === 'duns') {
+      //DUNS file
+      return arrRows
+         .map(sDUNS => //Correct the old school XX-XXX-XXXX DUNS format
+            sDUNS.length === 11 && sDUNS.slice(2, 3) === '-' && sDUNS.slice(6, 7) === '-'
+               ? sDUNS.slice(0, 2) + sDUNS.slice(3, 6) + sDUNS.slice(7)
+               : sDUNS
+         )
+         .filter(sDUNS => //Filter strings which are too long & non numeric values
+            sDUNS.length <= 9 && /^\d*$/.test(sDUNS)
+         )
+         .map(sDUNS => ({ duns: '000000000'.slice(0, 9 - sDUNS.length) + sDUNS }));
+   }
+
+   //Return an array of request objects
+   return arrRows.map(row => {
+      let oRet = {};
+
+      row.forEach((criterium, idx) => oRet[arrIn[0][idx]] = criterium);
+
+      return oRet;
+   });
 }
 
 export {
@@ -163,6 +188,7 @@ export {
    httpBlocks,
    httpBeneficialOwner,
    httpFamilyTree,
+   httpIDR,
    ReqDnbDpl,
-   readDunsFile
+   readInpFile
 };

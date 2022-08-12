@@ -27,7 +27,7 @@ import {
    httpBeneficialOwner,
    httpFamilyTree,
    ReqDnbDpl,
-   readDunsFile
+   readInpFile
 } from './dnbDplLib.js';
 
 //Application defaults
@@ -44,9 +44,9 @@ function getDnbDplDataBlockReqObj() {
       {db: 'companyinfo',              dbShort: 'ci', level: 2, version: '1'},
       {db: 'principalscontacts',       dbShort: 'pc', level: 3, version: '2'},
       {db: 'hierarchyconnections',     dbShort: 'hc', level: 1, version: '1'},
-      {db: 'financialstrengthinsight', dbShort: 'fs', level: 2, version: '1'},
-      {db: 'paymentinsight',           dbShort: 'pi', level: 1, version: '1'},
-      {db: 'eventfilings',             dbShort: 'ef', level: 1, version: '1'},
+   //   {db: 'financialstrengthinsight', dbShort: 'fs', level: 2, version: '1'},
+   //   {db: 'paymentinsight',           dbShort: 'pi', level: 1, version: '1'},
+   //   {db: 'eventfilings',             dbShort: 'ef', level: 1, version: '1'},
    //   {db: 'companyfinancials',        dbShort: 'cf', level: 4, version: '2'},
    //   {db: 'globalfinancials',         dbShort: 'gf', level: 1, version: '1'},
    //   {db: 'esginsight',               dbShort: 'ei', level: 3, version: '1'},
@@ -90,12 +90,12 @@ function getDnbDplFullFamTreeReqObj() {
 //Instantiate an array containing all relevant request objects
 const arrReqObjs = [
    getDnbDplDataBlockReqObj(),
-//   getDnbDplBeneficialOwnerReqObj(),
-//   getDnbDplFullFamTreeReqObj(),
+   getDnbDplBeneficialOwnerReqObj(),
+   getDnbDplFullFamTreeReqObj(),
 ];
 
 //Read & parse the DUNS to retrieve from the file DUNS.txt
-const arrDUNS = readDunsFile(filePathIn);
+const arrDUNS = readInpFile(filePathIn);
 
 //Main application logic
 if(arrDUNS.length === 0) { //Check if there are any valid DUNS available
@@ -104,22 +104,22 @@ if(arrDUNS.length === 0) { //Check if there are any valid DUNS available
 else { //Download and persist the data blocks for the requested DUNS
    console.log('Test file contains ' + arrDUNS.length + ' DUNS records');
 
-   arrDUNS.forEach(DUNS => {
+   arrDUNS.forEach(oDUNS => {
       arrReqObjs.forEach(reqObj => {
          const req = { ...reqObj };
 
          if(req.httpAttr === httpBlocks || req.httpAttr === httpFamilyTree) {
-            req.arrResource = [DUNS]
+            req.arrResource = [oDUNS.duns]
          }
 
          if(req.httpAttr === httpBeneficialOwner) {
-            req.qryStr.duns = DUNS
+            req.qryStr.duns = oDUNS.duns
          }
 
          new ReqDnbDpl(req.httpAttr, req.arrResource, req.qryStr)
-            .execReq(`Request for DUNS ${DUNS}`)
+            .execReq(`Request for DUNS ${oDUNS.duns}`)
                .then(resp => {
-                  const base = `${req.fileBase}_${DUNS}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
+                  const base = `${req.fileBase}_${oDUNS.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
 
                   fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
                      .then( /* console.log(`Wrote file ${base} successfully`) */ )
