@@ -42,6 +42,7 @@ const httpBlocks = 1;
 const httpBeneficialOwner = 2;
 const httpFamilyTree = 3;
 const httpIDR = 4;
+const httpCriteriaSearch = 5;
 
 //D&B Direct+ defaults for individual endpoints
 const arrHttpAttr = [
@@ -49,7 +50,8 @@ const arrHttpAttr = [
    {...httpDnbDpl, path: '/v1/data/duns'},
    {...httpDnbDpl, path: '/v1/beneficialowner'},
    {...httpDnbDpl, path: '/v1/familyTree'},
-   {...httpDnbDpl, path: '/v1/match/cleanseMatch'}
+   {...httpDnbDpl, path: '/v1/match/cleanseMatch'},
+   {...httpDnbDpl, method: 'POST', path: '/v1/search/criteria'}
 ];
 
 //Base64 encode the D&B Direct+ credentials
@@ -79,8 +81,16 @@ class ReqDnbDpl {
          this.httpAttr.path += '/' + arrResource.join('/')
       };
    
-      if(oQryStr) {this.httpAttr.path += '?' + new URLSearchParams(oQryStr).toString()}
-   
+      if(oQryStr) {
+         if(this.httpAttr.method === 'GET') {
+            this.httpAttr.path += '?' + new URLSearchParams(oQryStr).toString()
+         }
+
+         if(this.httpAttr.method === 'POST') {
+            this.oBody = oQryStr
+         }
+      }
+
       if(reqType === httpToken) {
          this.httpAttr.headers.Authorization = 'Basic ' + getBase64EncCredentials()
       }
@@ -123,9 +133,7 @@ class ReqDnbDpl {
                });
       
                if(this.httpAttr.method === 'POST') {
-                  if(this.reqType === httpToken) {
-                     httpReq.write('{ "grant_type": "client_credentials" }')
-                  }
+                  httpReq.write(JSON.stringify(this.oBody))
                }
       
                httpReq.end();
@@ -189,6 +197,7 @@ export {
    httpBeneficialOwner,
    httpFamilyTree,
    httpIDR,
+   httpCriteriaSearch,
    ReqDnbDpl,
    readInpFile
 };
