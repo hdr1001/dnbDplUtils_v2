@@ -143,6 +143,19 @@ class ReqDnbDpl {
    }
 }
 
+function addToCharacterSeparatedRow(value) {
+   const separator = '|';
+
+   switch(typeof value) {
+       case 'string':  return value + separator;
+       case 'boolean': return value.toString() + separator;
+       case 'number':  return value.toString() + separator;
+       case 'null':
+       case 'undefined': console.log('Input value is null or undefined');
+       default: return separator; 
+   }
+}
+
 function readInpFile(oFilePath, splitOn) {
    let arrIn = [];
 
@@ -199,5 +212,6 @@ export {
    httpIDR,
    httpCriteriaSearch,
    ReqDnbDpl,
+   addToCharacterSeparatedRow,
    readInpFile
 };

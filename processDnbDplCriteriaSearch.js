@@ -1,7 +1,7 @@
 // *********************************************************************
 //
-// Process D&B Direct+ data blocks
-// JavaScript code file: processDnbDplDBs.js
+// Process D&B Direct+ criteria search results
+// JavaScript code file: processDnbDplCriteriaSearch.js
 //
 // Copyright 2022 Hans de Rooij
 //
@@ -33,40 +33,40 @@ const filePath = { root: '', dir: 'out' };
 fs.readdir(path.format(filePath))
     .then(arrFiles => {
         arrFiles = arrFiles.filter(fn => fn.endsWith('.json'))
-                        .filter(fn => fn.indexOf('dnb_dpl_cmpbo') === -1)
-                        .filter(fn => fn.indexOf('dnb_dpl_full_fam') === -1);
+                        .filter(fn => fn.indexOf('dnb_dpl') === -1)
 
         arrFiles.forEach(fn => {
             readFileLimiter.removeTokens(1)
                 .then(() => {
                     fs.readFile(path.format({ ...filePath, base: fn }))
                         .then(file => {
-                            let dbs;
+                            let cs;
 
                             try {
-                                dbs = JSON.parse(file)
+                                cs = JSON.parse(file)
                             }
                             catch(err) {
                                 console.error(err.message);
                                 return;
                             }
 
-                            const org = dbs.organization;
+                            const numCandRet = cs.candidatesReturnedQuantity;
 
-                            let retStr = '';
+                            if(numCandRet) {
+                              const arrCand = cs.searchCandidates;
 
-                            retStr += addToCharacterSeparatedRow(org.duns);
-                            retStr += addToCharacterSeparatedRow(org.primaryName);
-                            retStr += addToCharacterSeparatedRow(org.countryISOAlpha2Code);
+                              arrCand.forEach(candidate => {
+                                 let retStr = '';
 
-                            if(org.dunsControlStatus && org.dunsControlStatus.operatingStatus) {
-                                retStr += addToCharacterSeparatedRow(org.dunsControlStatus.operatingStatus.description)
+                                 const org = candidate.organization;
+
+                                 retStr += addToCharacterSeparatedRow(org.primaryName);
+                                 retStr += addToCharacterSeparatedRow(org?.primaryAddress?.addressCountry?.isoAlpha2Code);
+                                 retStr += addToCharacterSeparatedRow(org.duns);
+
+                                 console.log(retStr.slice(0, -1));
+                              });
                             }
-                            else {
-                                retStr += addToCharacterSeparatedRow('')
-                            }
-
-                            console.log(retStr.slice(0, -1));
                         })
                         .catch(err => console.error(err.message))
                 })
