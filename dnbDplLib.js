@@ -118,17 +118,20 @@ class ReqDnbDpl {
       
                         //if(resp.statusCode !== 200) { console.log(body.join('')) }
                      }
-      
+
+                     const ret = { buffBody: body, httpStatus: resp.statusCode };
+                     
                      if(bRetObj) {
                         try {
-                           resolve({ oBody: JSON.parse(body), httpStatus: resp.statusCode })
+                           ret.oBody = JSON.parse(body);
                         }
-                        catch(err) { reject(err) }
+                        catch(err) {
+                           reject(err);
+                           return;
+                        }
                      }
-                     else {
-                         //Please note body is of type buffer!
-                        resolve({ buffBody: body, httpStatus: resp.statusCode })
-                     }
+
+                     resolve(ret);
                   });
                });
       
