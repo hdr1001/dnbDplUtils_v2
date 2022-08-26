@@ -37,22 +37,13 @@ const filePathIn = { root: '', dir: 'in', base: 'DUNS.txt' };
 const filePathOut = { root: '', dir: 'out' };
 const sDate = new Date().toISOString().split('T')[0];
 
-function getDnbDplDataBlockReqObj() {
-   const arrDBs = [
-      {db: 'companyinfo',              dbShort: 'ci', level: 2, version: '1'},
-      {db: 'principalscontacts',       dbShort: 'pc', level: 3, version: '2'},
-      {db: 'hierarchyconnections',     dbShort: 'hc', level: 1, version: '1'}
-   ];
+const arrDBs = [
+   {db: 'companyinfo',              dbShort: 'ci', level: 2, version: '1'},
+   {db: 'principalscontacts',       dbShort: 'pc', level: 3, version: '2'},
+   {db: 'hierarchyconnections',     dbShort: 'hc', level: 1, version: '1'}
+];
 
-   const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`);
-
-   return {
-      httpAttr: httpBlocks,
-      arrBlockIDs,
-      fileBase: arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl'),
-      qryStr: { blockIDs: arrBlockIDs.join(','), ...reasonCode , ...tradeUp }
-   }
-}
+const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`);
 
 //Read & parse the DUNS to retrieve from the file DUNS.txt
 const arrDUNS = readInpFile(filePathIn);
@@ -64,26 +55,32 @@ if(arrDUNS.length === 0) { //Check if there are any valid DUNS available
 else { //Download and persist the data blocks for the requested DUNS
    console.log('Test file contains ' + arrDUNS.length + ' DUNS records');
 
-   arrDUNS.forEach(oDUNS => {
-      const req = { ...getDnbDplDataBlockReqObj() };
-
-      req.arrResource = [oDUNS.duns];
-
-      new ReqDnbDpl(req.httpAttr, req.arrResource, req.qryStr)
+   const arrReqs = arrDUNS.map(oDUNS => 
+      new ReqDnbDpl(
+         httpBlocks,
+         [oDUNS.duns],
+         { blockIDs: arrBlockIDs.join(','), ...reasonCode , ...tradeUp }
+      )
          .execReq(`Request for DUNS ${oDUNS.duns}`, true)
             .then(resp => {
-               const base = `${req.fileBase}_${oDUNS.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
+               const fileBase = arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl');
+
+               const base = `${fileBase}_${oDUNS.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
 
                fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
                   .then( /* console.log(`Wrote file ${base} successfully`) */ )
                   .catch(err => console.error(err.message));
 
-               if(resp.oBody && resp.oBody.organization) {
+               if(resp && resp.oBody && resp.oBody.organization) {
                   const org = resp.oBody.organization;
-                  
-                  console.log(org.primaryName);
+
+                  return org.primaryName;
                }
+
+               return -1;
             })
-            .catch(err => console.error(err.message));
-   });
+            .catch(err => {console.error(err.message); return -1})
+   );
+
+   Promise.all(arrReqs).then(values => console.log(`All done, ${values.join(',')}`));
 }

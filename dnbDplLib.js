@@ -106,11 +106,11 @@ class ReqDnbDpl {
          dnbDplLimiter.removeTokens(1)
             .then(() => {
                const httpReq = https.request(this.httpAttr, resp => {
-                  const body = [];
+                  const chunks = [];
       
                   resp.on('error', err => reject(err));
       
-                  resp.on('data', chunk => body.push(chunk));
+                  resp.on('data', chunk => chunks.push(chunk));
       
                   resp.on('end', () => { //The data product is now available in full
                      if(reqMsgOnEnd) { 
@@ -119,11 +119,15 @@ class ReqDnbDpl {
                         //if(resp.statusCode !== 200) { console.log(body.join('')) }
                      }
 
-                     const ret = { buffBody: body, httpStatus: resp.statusCode };
+                     const size = chunks.reduce((prev, curr) => prev + curr.length, 0);
+
+                     const buffBody = Buffer.concat(chunks, size);
+
+                     const ret = { buffBody, httpStatus: resp.statusCode };
                      
                      if(bRetObj) {
                         try {
-                           ret.oBody = JSON.parse(body);
+                           ret.oBody = JSON.parse(buffBody);
                         }
                         catch(err) {
                            reject(err);
