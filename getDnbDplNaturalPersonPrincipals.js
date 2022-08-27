@@ -25,8 +25,10 @@ import { promises as fs } from 'fs';
 import { 
    httpBlocks,
    ReqDnbDpl,
+   addToCharacterSeparatedRow,
    readInpFile
 } from './dnbDplLib.js';
+import { resolveSoa } from 'dns';
 
 //Application defaults
 const tradeUp = null; //Set to {tradeUp: 'hq'} if trade-up is needed
@@ -47,6 +49,31 @@ const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`)
 
 //Read & parse the DUNS to retrieve from the file DUNS.txt
 const arrDUNS = readInpFile(filePathIn);
+
+function getDnbDplNatPersonPrincipals(org, compRet) {
+   //mostSeniorPrincipals is a v1 array, mostSeniorPrincipal is a v2 object
+   const { currentPrincipals, mostSeniorPrincipals, mostSeniorPrincipal } = org;
+
+   let arrPrincipals = [];
+   
+   if(mostSeniorPrincipals && mostSeniorPrincipals.length > 0) { arrPrincipals = mostSeniorPrincipals }
+
+   if(mostSeniorPrincipal && mostSeniorPrincipal.fullName) { arrPrincipals.push(mostSeniorPrincipal) }
+
+   arrPrincipals.forEach(principal => principal.isMostSenior = true);
+
+   if(currentPrincipals && currentPrincipals.length > 0) {
+      arrPrincipals = [].concat(arrPrincipals, currentPrincipals)
+   }
+
+   if(arrPrincipals.length === 0) { return [''] }
+
+   return Promise.all(arrPrincipals.map(principal => 
+      new Promise((resolve, reject) => {
+         resolve((compRet + addToCharacterSeparatedRow(principal.fullName)).slice(0, -1));
+      })
+   ));
+}
 
 //Main application logic
 if(arrDUNS.length === 0) { //Check if there are any valid DUNS available
@@ -74,13 +101,23 @@ else { //Download and persist the data blocks for the requested DUNS
                if(resp && resp.oBody && resp.oBody.organization) {
                   const org = resp.oBody.organization;
 
-                  return org.primaryName;
+                  let ret = addToCharacterSeparatedRow(org.duns);
+                  ret += addToCharacterSeparatedRow(org.primaryName);
+
+                  getDnbDplNatPersonPrincipals(org, ret)
+                     .then(values => {return values.join('\n')});
                }
 
-               return -1;
+               return '';
             })
             .catch(err => {console.error(err.message); return -1})
    );
 
-   Promise.all(arrReqs).then(values => console.log(`All done, ${values.join(',')}`));
+   Promise.all(arrReqs).then(values => {
+      const base = 'natPersonPrincipals.txt';
+
+      fs.writeFile(path.format({ ...filePathOut, base }), values.join('\n'))
+         .then( /* console.log(`Wrote file ${base} successfully`) */ )
+         .catch(err => console.error(err.message));
+   });
 }
