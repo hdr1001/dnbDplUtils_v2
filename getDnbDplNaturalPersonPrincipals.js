@@ -28,7 +28,6 @@ import {
    addToCharacterSeparatedRow,
    readInpFile
 } from './dnbDplLib.js';
-import { resolveSoa } from 'dns';
 
 //Application defaults
 const tradeUp = null; //Set to {tradeUp: 'hq'} if trade-up is needed
@@ -40,9 +39,9 @@ const filePathOut = { root: '', dir: 'out' };
 const sDate = new Date().toISOString().split('T')[0];
 
 const arrDBs = [
-   {db: 'companyinfo',              dbShort: 'ci', level: 2, version: '1'},
-   {db: 'principalscontacts',       dbShort: 'pc', level: 3, version: '2'},
-   {db: 'hierarchyconnections',     dbShort: 'hc', level: 1, version: '1'}
+   {db: 'companyinfo',          dbShort: 'ci', level: 2, version: '1'},
+   {db: 'principalscontacts',   dbShort: 'pc', level: 3, version: '2'},
+   {db: 'hierarchyconnections', dbShort: 'hc', level: 1, version: '1'}
 ];
 
 const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`);
@@ -50,7 +49,7 @@ const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`)
 //Read & parse the DUNS to retrieve from the file DUNS.txt
 const arrDUNS = readInpFile(filePathIn);
 
-function getDnbDplNatPersonPrincipals(org, compRet) {
+function getDnbDplNatPersonPrincipals(org) {
    //mostSeniorPrincipals is a v1 array, mostSeniorPrincipal is a v2 object
    const { currentPrincipals, mostSeniorPrincipals, mostSeniorPrincipal } = org;
 
@@ -66,13 +65,11 @@ function getDnbDplNatPersonPrincipals(org, compRet) {
       arrPrincipals = [].concat(arrPrincipals, currentPrincipals)
    }
 
-   if(arrPrincipals.length === 0) { return [''] }
+   if(arrPrincipals.length === 0) { return null }
 
-   return Promise.all(arrPrincipals.map(principal => 
-      new Promise((resolve, reject) => {
-         resolve((compRet + addToCharacterSeparatedRow(principal.fullName)).slice(0, -1));
-      })
-   ));
+   return arrPrincipals
+      //.filter(principal => principal.subjectType !== 'Businesses')
+      .map(principal => addToCharacterSeparatedRow(principal.fullName));
 }
 
 //Main application logic
@@ -89,34 +86,43 @@ else { //Download and persist the data blocks for the requested DUNS
          { blockIDs: arrBlockIDs.join(','), ...reasonCode , ...tradeUp }
       )
          .execReq(`Request for DUNS ${oDUNS.duns}`, true)
-            .then(resp => {
-               const fileBase = arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl');
-
-               const base = `${fileBase}_${oDUNS.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
-
-               fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
-                  .then( /* console.log(`Wrote file ${base} successfully`) */ )
-                  .catch(err => console.error(err.message));
-
-               if(resp && resp.oBody && resp.oBody.organization) {
-                  const org = resp.oBody.organization;
-
-                  let ret = addToCharacterSeparatedRow(org.duns);
-                  ret += addToCharacterSeparatedRow(org.primaryName);
-
-                  getDnbDplNatPersonPrincipals(org, ret)
-                     .then(values => {return values.join('\n')});
-               }
-
-               return '';
-            })
-            .catch(err => {console.error(err.message); return -1})
    );
 
-   Promise.all(arrReqs).then(values => {
-      const base = 'natPersonPrincipals.txt';
+   Promise.all(arrReqs).then(arrDnbDplResp => {
+      let arrNatPersonPrincipals = [];
 
-      fs.writeFile(path.format({ ...filePathOut, base }), values.join('\n'))
+      arrDnbDplResp.forEach(resp => {
+         let org = null;
+
+         if(resp && resp.oBody && resp.oBody.organization) {
+            org = resp.oBody.organization
+         }
+         else { return }
+   
+         const fileBase = arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl');
+   
+         const base = `${fileBase}_${org.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
+   
+         fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
+            .then( /* console.log(`Wrote file ${base} successfully`) */ )
+            .catch(err => console.error(err.message));
+
+         let basics = addToCharacterSeparatedRow(org.duns);
+         basics += addToCharacterSeparatedRow(org.primaryName);
+
+         const arrPrincipals = getDnbDplNatPersonPrincipals(org);
+
+         if(arrPrincipals) {
+            arrNatPersonPrincipals = arrNatPersonPrincipals.concat(
+               arrPrincipals.map(principal => basics + principal.slice(0, -1))
+            )
+         }
+         else {
+            arrNatPersonPrincipals.push(basics.slice(0, -1))
+         }
+      })
+
+      fs.writeFile(path.format({ ...filePathOut, base: 'natPersonPrincipals.txt' }), arrNatPersonPrincipals.join('\n'))
          .then( /* console.log(`Wrote file ${base} successfully`) */ )
          .catch(err => console.error(err.message));
    });
