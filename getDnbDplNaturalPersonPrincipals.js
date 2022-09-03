@@ -25,7 +25,6 @@ import { promises as fs } from 'fs';
 import { 
    httpBlocks,
    ReqDnbDpl,
-   addToCharacterSeparatedRow,
    readInpFile
 } from './dnbDplLib.js';
 
@@ -49,7 +48,8 @@ const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`)
 //Read & parse the DUNS to retrieve from the file DUNS.txt
 const arrDUNS = readInpFile(filePathIn);
 
-function getDnbDplNatPersonPrincipals(org) {
+//Process the principals objects in a stack of data blocks
+function processPrincipals(org) {
    //mostSeniorPrincipals is a v1 array, mostSeniorPrincipal is a v2 object
    const { currentPrincipals, mostSeniorPrincipals, mostSeniorPrincipal } = org;
 
@@ -57,7 +57,7 @@ function getDnbDplNatPersonPrincipals(org) {
    
    if(mostSeniorPrincipals && mostSeniorPrincipals.length > 0) { arrPrincipals = mostSeniorPrincipals }
 
-   if(mostSeniorPrincipal && mostSeniorPrincipal.fullName) { arrPrincipals.push(mostSeniorPrincipal) }
+   if(mostSeniorPrincipal && Object.keys(mostSeniorPrincipal).length > 0) { arrPrincipals.push(mostSeniorPrincipal) }
 
    arrPrincipals.forEach(principal => principal.isMostSenior = true);
 
@@ -65,11 +65,22 @@ function getDnbDplNatPersonPrincipals(org) {
       arrPrincipals = [].concat(arrPrincipals, currentPrincipals)
    }
 
-   if(arrPrincipals.length === 0) { return null }
+   if(arrPrincipals.length === 0) { return [Promise.reject(new Error('No principals available'))] }
 
-   return arrPrincipals
-      //.filter(principal => principal.subjectType !== 'Businesses')
-      .map(principal => addToCharacterSeparatedRow(principal.fullName));
+   return arrPrincipals.map(principal => {
+      const arrIdNums = principal.idNumbers && principal.idNumbers.filter(id => id.idType.dnbCode === 3575);
+
+      if(principal.subjectType === 'Businesses' &&
+            Array.isArray(arrIdNums) && arrIdNums.length > 0) {
+
+         principal.org = { duns: arrIdNums[0].idNumber };
+
+         return Promise.resolve(principal);
+      }
+      else {
+         return Promise.resolve(principal);
+      }
+   })
 }
 
 //Main application logic
@@ -89,8 +100,6 @@ else { //Download and persist the data blocks for the requested DUNS
    );
 
    Promise.all(arrReqs).then(arrDnbDplResp => {
-      let arrNatPersonPrincipals = [];
-
       arrDnbDplResp.forEach(resp => {
          let org = null;
 
@@ -103,27 +112,17 @@ else { //Download and persist the data blocks for the requested DUNS
    
          const base = `${fileBase}_${org.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
    
-         fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
-            .then( /* console.log(`Wrote file ${base} successfully`) */ )
+         //fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
+         //   .then( /* console.log(`Wrote file ${base} successfully`) */ )
+         //   .catch(err => console.error(err.message));
+
+         Promise.all(processPrincipals(org))
+            .then(principals => {
+               fs.writeFile(path.format({ ...filePathOut, base }), JSON.stringify(resp.oBody, null, 3))
+                  .then( /* console.log(`Wrote file ${base} successfully`) */ )
+                  .catch(err => console.error(err.message));
+            })
             .catch(err => console.error(err.message));
-
-         let basics = addToCharacterSeparatedRow(org.duns);
-         basics += addToCharacterSeparatedRow(org.primaryName);
-
-         const arrPrincipals = getDnbDplNatPersonPrincipals(org);
-
-         if(arrPrincipals) {
-            arrNatPersonPrincipals = arrNatPersonPrincipals.concat(
-               arrPrincipals.map(principal => basics + principal.slice(0, -1))
-            )
-         }
-         else {
-            arrNatPersonPrincipals.push(basics.slice(0, -1))
-         }
-      })
-
-      fs.writeFile(path.format({ ...filePathOut, base: 'natPersonPrincipals.txt' }), arrNatPersonPrincipals.join('\n'))
-         .then( /* console.log(`Wrote file ${base} successfully`) */ )
-         .catch(err => console.error(err.message));
+      });
    });
 }
