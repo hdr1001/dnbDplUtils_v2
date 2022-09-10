@@ -158,7 +158,7 @@ function addToCharacterSeparatedRow(value) {
        case 'boolean': return value.toString() + separator;
        case 'number':  return value.toString() + separator;
        case 'null':
-       case 'undefined': console.log('Input value is null or undefined');
+       case 'undefined': /* console.log('Input value is null or undefined') */;
        default: return separator; 
    }
 }

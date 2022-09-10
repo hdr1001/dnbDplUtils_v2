@@ -25,6 +25,7 @@ import { promises as fs } from 'fs';
 import { 
    httpBlocks,
    ReqDnbDpl,
+   addToCharacterSeparatedRow,
    readInpFile
 } from './dnbDplLib.js';
 
@@ -48,8 +49,8 @@ const arrBlockIDs = arrDBs.map(oDB => `${oDB.db}_L${oDB.level}_v${oDB.version}`)
 //Read & parse the DUNS to retrieve from the file DUNS.txt
 const arrDUNS = readInpFile(filePathIn);
 
-//Process the principals objects in a stack of data blocks
-function processPrincipals(org) {
+//Create one array containing all principal objects
+function createArrPrincipals(org) {
    //mostSeniorPrincipals is a v1 array, mostSeniorPrincipal is a v2 object
    const { currentPrincipals, mostSeniorPrincipals, mostSeniorPrincipal } = org;
 
@@ -65,22 +66,52 @@ function processPrincipals(org) {
       arrPrincipals = [].concat(arrPrincipals, currentPrincipals)
    }
 
-   if(arrPrincipals.length === 0) { return [Promise.reject(new Error('No principals available'))] }
+   return arrPrincipals;
+}
 
-   return arrPrincipals.map(principal => {
+//Determine if a principal is a business (with a valid DUNS)
+function principalIsBusiness(principal) {
+   const ret = {isBusiness: false, sDUNS: ''};
+
+   if(principal.subjectType === 'Businesses') {
+      ret.isBusiness = true;
+
       const arrIdNums = principal.idNumbers && principal.idNumbers.filter(id => id.idType.dnbCode === 3575);
 
-      if(principal.subjectType === 'Businesses' &&
-            Array.isArray(arrIdNums) && arrIdNums.length > 0) {
-
-         principal.org = { duns: arrIdNums[0].idNumber };
-
-         return Promise.resolve(principal);
+      if(arrIdNums.length) {
+         ret.sDUNS = arrIdNums[0].idNumber
       }
-      else {
-         return Promise.resolve(principal);
+   }
+
+   return ret;
+}
+
+//Process the principals associated with a DUNS
+function processPrincipals(org) {
+   const oOut = {duns: org.duns, primaryName: org.primaryName};
+
+   const arrPrincipals = createArrPrincipals(org);
+
+   if(arrPrincipals.length === 0) {
+      return [ Promise.resolve( { ...oOut } ) ]
+   }
+
+   return arrPrincipals.map(principal => {
+      const oPrincipalIsBusiness = principalIsBusiness(principal);
+   
+      if(oPrincipalIsBusiness.isBusiness && oPrincipalIsBusiness.sDUNS.length){
+         return Promise.resolve({
+            ...oOut,
+            fullName: principal.fullName,
+            dunsPrincipal: oPrincipalIsBusiness.sDUNS
+         })
       }
-   })
+   
+      return Promise.resolve({
+         ...oOut,
+         fullName: principal.fullName
+      });
+   });
 }
 
 //Main application logic
@@ -90,39 +121,42 @@ if(arrDUNS.length === 0) { //Check if there are any valid DUNS available
 else { //Download and persist the data blocks for the requested DUNS
    console.log('Test file contains ' + arrDUNS.length + ' DUNS records');
 
-   const arrReqs = arrDUNS.map(oDUNS => 
+   const fileBase = arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl');
+
+   arrDUNS.forEach(oDUNS => 
       new ReqDnbDpl(
          httpBlocks,
          [oDUNS.duns],
          { blockIDs: arrBlockIDs.join(','), ...reasonCode , ...tradeUp }
       )
-         .execReq(`Request for DUNS ${oDUNS.duns}`, true)
-   );
+         .execReq('', true)
+            .then(resp => {
+               let org = null;
 
-   Promise.all(arrReqs).then(arrDnbDplResp => {
-      arrDnbDplResp.forEach(resp => {
-         let org = null;
-
-         if(resp && resp.oBody && resp.oBody.organization) {
-            org = resp.oBody.organization
-         }
-         else { return }
-   
-         const fileBase = arrDBs.reduce((acc, oDB) => `${acc}_${oDB.dbShort}_l${oDB.level}`, 'dnb_dpl');
-   
-         const base = `${fileBase}_${org.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
-   
-         //fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
-         //   .then( /* console.log(`Wrote file ${base} successfully`) */ )
-         //   .catch(err => console.error(err.message));
-
-         Promise.all(processPrincipals(org))
-            .then(principals => {
-               fs.writeFile(path.format({ ...filePathOut, base }), JSON.stringify(resp.oBody, null, 3))
+               if(resp && resp.oBody && resp.oBody.organization) {
+                  org = resp.oBody.organization
+               }
+               else { return }
+         
+               const base = `${fileBase}_${org.duns}_${sDate}${resp.httpStatus === 200 ? '' : `_${resp.httpStatus}`}.json`;
+      
+               fs.writeFile(path.format({ ...filePathOut, base }), resp.buffBody)
                   .then( /* console.log(`Wrote file ${base} successfully`) */ )
                   .catch(err => console.error(err.message));
+      
+               Promise.all(processPrincipals(org))
+                  .then(arrOut => {
+                     arrOut.map(oLine => {
+                        let sOut = '';
+         
+                        sOut = addToCharacterSeparatedRow(oLine.duns);
+                        sOut += addToCharacterSeparatedRow(oLine.primaryName);
+                        sOut += addToCharacterSeparatedRow(oLine.fullName);
+                        sOut += addToCharacterSeparatedRow(oLine.dunsPrincipal);
+            
+                        console.log(sOut.slice(0, -1));
+                     }).join('\n')
+                  })
             })
-            .catch(err => console.error(err.message));
-      });
-   });
+   );
 }
